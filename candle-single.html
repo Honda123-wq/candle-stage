@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.3/howler.min.js"></script>
+
+    <title>ろうそくを消そう</title>
+    <style>
+      body {
+        background: #111;
+        color: white;
+        font-family: sans-serif;
+        text-align: center;
+        padding: 2rem;
+      }
+      video,
+      canvas {
+        display: none;
+        /* border: 2px solid white;
+        margin-top: 1rem; */
+      }
+      #motionStatus,
+      #motionDetected {
+        display: none;
+        /* font-size: 24px;
+        font-weight: bold;
+        background-color: black;
+        padding: 0.5em 1em;
+        border-radius: 8px;
+        margin-top: 1rem;
+        display: inline-block;
+        color: #fff;
+        min-width: 300px; */
+      }
+      #candle,
+      #candleOut {
+        width: 100px;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>ろうそくを消そう</h1>
+    <p id="motionStatus">
+      <span id="noMotion">動きを感知していません💤</span>
+      <span id="motionDetected" style="display: none"
+        >💨 モーション検知されたよ！</span
+      >
+    </p>
+
+    <div style="position: relative; display: inline-block">
+      <video id="video" width="640" height="480" autoplay></video>
+      <canvas id="canvas" width="640" height="480"></canvas>
+    </div>
+
+    <img id="candle" src="candle.png.png" alt="ろうそく" />
+    <img id="candleOut" src="candle-out.png" alt="消えたろうそく" />
+    <p id="candleStatus">🔥ろうそくが灯ってるよ</p>
+    <!-- 次のステージへボタン（最初は非表示） -->
+    <button
+      id="nextBtn"
+      onclick="location.href='candle-chord.html'"
+      style="display: none"
+    >
+      👉 次のステージへ
+    </button>
+
+    <script>
+      candleStatus.innerText = "🔥ろうそくが灯ってるよ";
+      const video = document.getElementById("video");
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+      const noMotion = document.getElementById("noMotion");
+      const motionDetected = document.getElementById("motionDetected");
+      const candleSound = new Howl({
+        src: ["candle_wind.mp3"],
+        volume: 0.7,
+      });
+
+      candle.style.display = "block";
+      candleOut.style.display = "none";
+      candleStatus.innerText = "🔥 ろうそくが灯ってるよ";
+
+      let previousFrame = null;
+
+      navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
+        video.srcObject = stream;
+      });
+
+      let previousState = "no-motion";
+      let motionCounter = 0;
+      const motionThreshold = 200; // 非常に高感度
+      const framesForStableState = 2; // すぐに反応
+
+      function detectMotion() {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const currentFrame = ctx.getImageData(
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
+
+        if (previousFrame) {
+          let diff = 0;
+          for (let i = 0; i < currentFrame.data.length; i += 4) {
+            const r = Math.abs(currentFrame.data[i] - previousFrame.data[i]);
+            const g = Math.abs(
+              currentFrame.data[i + 1] - previousFrame.data[i + 1]
+            );
+            const b = Math.abs(
+              currentFrame.data[i + 2] - previousFrame.data[i + 2]
+            );
+            if (r + g + b > 50) diff++;
+          }
+
+          console.log("差分（diff）:", diff); // ←デバッグ情報
+
+          if (diff > motionThreshold) {
+            motionCounter++;
+            if (
+              motionCounter >= framesForStableState &&
+              previousState !== "motion"
+            ) {
+              noMotion.style.display = "none";
+              motionDetected.style.display = "inline";
+              if (candle.style.display === "block") {
+                candle.style.display = "none";
+                candleOut.style.display = "inline";
+                candleStatus.innerText = "💨 ろうそくを吹き消したよ！";
+                candleSound.play();
+
+                // 🔥 ボタンを表示！
+                document.getElementById("nextBtn").style.display =
+                  "inline-block";
+              }
+
+              previousState = "motion";
+              motionCounter = 0;
+            }
+          } else {
+            motionCounter++;
+            if (
+              motionCounter >= framesForStableState &&
+              previousState !== "no-motion"
+            ) {
+              motionDetected.style.display = "none";
+              noMotion.style.display = "inline";
+              previousState = "no-motion";
+              motionCounter = 0;
+            }
+          }
+
+          if (
+            (diff > motionThreshold && previousState === "motion") ||
+            (diff <= motionThreshold && previousState === "no-motion")
+          ) {
+            motionCounter = 0;
+          }
+        }
+
+        previousFrame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        requestAnimationFrame(detectMotion);
+      }
+
+      video.addEventListener("playing", () => {
+        requestAnimationFrame(detectMotion);
+      });
+    </script>
+  </body>
+</html>
